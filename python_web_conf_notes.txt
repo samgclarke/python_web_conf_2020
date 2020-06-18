@@ -1,0 +1,430 @@
+﻿
+**Monitoring and Testing web Applications in the Wild**
+
+
+    Sam Clarke
+
+------------------------------------------
+
+~~~ Good morning Python Web Conf!  ~~~
+
+------------------------------------------
+
+**Introduction => dashboard**
+
+    Something’s not right, but what?
+    We can do better...
+
+
+Any of you who are car owners - especially of an older vehicle will be familiar with this warning light. My car is almost 20 years old for the record.
+
+A single orange warning light which covers everything from the gas cap not being replaced to a misfiring engine. How do I know how serious the issue is? Should I keep driving down the road or pull over?
+
+This does not give me a great deal of inisght into the problem....
+
+
+------------------------------------------
+
+
+**Introduction => ODB II**
+
+So a few years ago I purchased this little gizmo, I think for a few dollars on ebay or amazon. And it has been one of the most worthwhile pieces of technology I have ever bought.
+
+This little device slots into the now standard ODB port which is required to be located within 2 feet of the steering wheel.
+
+It has bluetooth on board which allows it to be paired with a smartphone and there are several apps which make the diagnostic information easier to read.
+
+With the ODB II interface, ##overnight## my engine’s status went from this ##black box## to a stream of real-time data and standardized fault codes which allowed me to better understand what was going on with my vehicle.
+
+And not only was I aware of the status of my engine I was also able to learn a lot more by researching fault codes as they came up. 
+
+This didn't turn me into a qualified mechanic but it did give a much better understanding of the the complex system that is my car engine.
+
+
+------------------------------------------
+
+
+**Who am I?**
+
+    Sam Clarke
+    Senior Developer at
+
+OK.
+So my name is Sam Clarke, and I currently work as a Senior Developer at AgFunder, which is a venture capital firm founded in 2012, which focuses on investing in technologies which transform our food and agriculture system.
+
+My background is in the Biological sciences although I sidestepped into web development a little over 10 years ago.
+
+One of the products of AgFunder is our website at agfunder.com, which as well as detailing current investment portfolios, also provides investment insight via bespoke market reports.
+
+Releasing of these influential reports often results in traffic spikes orders of magnitude above baseline and it’s crucial to our business that the website remain performant during these times. 
+
+I have built and shipped a variety of web apps and most of the things I'm going to spak about today I have learned the hard way.
+
+------------------------------------------
+
+**Introduction => Summary**
+
+
+This is brief outline of whay I'll cover to day.
+
+------------------------------------------
+
+**Introduction => Definitions**
+
+
+So the pitch of this talk is beginner/ intermediate so I think it's a good idea to flag up a couple of important definitions, in case anyon eis unfamiliar with these terms, or I in case I define them differntly to you. 
+
+------------------------------------------
+
+**Why this talk? => Your app will fail.**
+
+
+So why id I propose this talk and why am I speaking to you here today?
+
+As most of us who are software engineers come to understand, failure is very much built into our work. It’s an integral aspect of our jobs.
+
+Having said that, failure is a spectrum. From an unclosed html element, to our server box melting and taking our product offline.
+
+What we learn as engineers over time is the ability to predict, prepare and act on failure.
+
+------------------------------------------
+
+**Why this talk? => “No battle plan survives first contact with the enemy.”
+
+    Helmuth von Moltke the Elder -
+
+Many of you may be familiar with this quote
+
+Moltke was the Chief of Staff of the Prussian army before World War 1. The insight embodied in this quote led to Moltke's desire to evolve beyond deterministic battle plans in favor of resilient strategies that could adapt to real battle situations as they occurred. In essence the best strategy was that which left some room for flexibility to account for the real world.
+
+In fact this concept can be applied to so many areas of life. For example putting a conference talk together in the comfort of my office at home and then actually presenting it to all of you folks...
+
+Having a web application of even moderate complexity running in Production is to expose our code to many unforeseen circumstances, from API latency to disk space to traffic spikes. 
+
+Being able to introspect what is happening inside our software is invaluable if you care about accessibility and performance of that software.
+
+As a developer we all inevitably move from developing our app in a closed environment to shipping it to the wilds of the internet.
+
+------------------------------------------
+
+**Dev != Production => It worked in Dev**
+
+
+Another well-used quote. I attribute this one to, well, most developers.
+
+If you haven’t said these words you have most likely thought them. Or you will.
+
+Shipping our application can be a scary and stressful experience. Depending on our release process, 
+this can be where the real engineering work begins. 
+
+What is acceptable in Dev may not fly for our users. For example we may have to contend with additional variables 
+(site availability, response times, restricted bandwidth and browser compatibility).
+
+------------------------------------------ 
+
+**Dev != Production**
+
+    Debug mode is off (it is off right?)
+    Multiple users, multiple concurrent requests.
+    Network latency (clients, dbs, APIs)
+    Production architecture may be significantly more complex (containers, clusters, permissions etc.)
+
+
+So the development environment can be quite different from our Production environments.
+
+For starters, debugging is inherently more opaque, and issues may not be easily reproducible. 
+In dev we can watch a bug unfold. In Production we may not catch the bug in real time and reconstructing the circumstances which contributed to the issue can be tricky.
+
+We now have many (hopefully) users making all sorts of requests to our webapp. Some of these might not even be nice requests…. 
+
+A particularly long response cycle in dev could cripple our app in Production when only a few users are involved.
+
+It’s likely but not a given that our Production version will have an increased dependency on network traffic. 
+This could simple be between our end users and the servers, or between app servers and a database server or API endpoints which are mocked in Dev.
+
+-----------------------------------------
+
+**Dev != Production**
+
+    Staging environments close the gap between Dev and Production.
+
+Though not the focus of this talk, I want to quickly mention the value of having a Staging environment to test the Production-like qualities of our app.
+
+A Staging environment generally sits somewhere in between Dev and Production but is most useful when it is more closely aligned with Production.
+
+-----------------------------------------
+
+**The value of Monitoring => Dog Fire**
+
+
+So why would we want to monitor our shiny new web application? It works fine in Dev right?
+
+We could just pass our unit tests, get a green dot from our Continuous Integration platform and ship to Production. Everything will be fine, right?
+
+Unit tests are not sufficient. They only test againts a speciified set of inputs and are ocnducted in very controlled environments.
+
+-----------------------------------------
+
+**The value of Monitoring**
+
+    Insight requires Feedback
+
+
+To diagnose issues within our applications we need feedback. Remember my ODBII thingybob?
+
+We need information to flow back to us from our deployed code.
+
+Our goal in monitoring our application should be to create a rich stream of informational feedback.
+
+With this information flow we can start to construct a picture of how our software is performing, spot potential issue and post-mortem a problem when it inevitably happens.
+
+Insight is a broad definition in this case. Insight refers to everything from granular performance to critical failures.
+
+-----------------------------------------
+
+**Why monitor?**
+
+    This is not high quality feedback.
+
+
+On the right side of this slide you can see a terse email from an unhappy user. 
+
+this is not the type of feedback you want to rely on for a number of reasons.
+
+- It means a user has encountered a critical problem, which looks very bad and could have serious business implications. 
+
+- In our case at AgFunder, this could be a ##potential investor## and the loss could be ##tangible investment revenue##.
+
+- This user took the time to get in touch. but how many other users experienced the same issue and did not leave feedback?
+
+- As engineers we want to be aware of a problem and have a fix in place before we get to this stage.
+
+-----------------------------------------
+
+**Why monitor?**
+
+    Catch warning signs of problems before they escalate.
+    Improve response times.
+    Create a record of performance over time.
+
+
+With Monitoring in our toolbox, our goal is to catch issues as they happen, improve responses and create a narrative around the issue for later analysis.
+
+To callback to Moltke -> You don't really undertstand yout code until you observe it in Production.
+
+-----------------------------------------
+
+**Why monitor?**
+
+    Web server - timeouts, file handling
+    Application - bugs and stuff
+    Database - data corruption, hardware
+    Host - overloading, crashing, network
+    Caching*
+
+
+It can be difficult to anticipate all the things which can go wrong unless you are very experienced (i.e bad stuff has happened to you before). 
+
+Even a simple web app has several layers of technology upon which it depends. 
+
+Try to be familiar with these layers before you deploy. How easy is it to first pinpoint the layer which is manifesting the issue?
+
+
+Many of these layers may not require our input directly and may well be managed by a third party - it’s the application layer where you can have the most impact.
+
+Caching can be a component of all these layers, and can often be a source of indirection when debugging. Can you easily bypass the cache?
+
+
+-----------------------------------------
+
+**What to Monitor?**
+
+    Logging - application code
+    Load - host performance at scale
+    Uptime - availability
+    Metrics - system resources, response times
+    Performance - all of the above
+
+On this slide are some of the key aspects of our app which we are interested in collecting data about.
+
+Logging - how you record status of our app.
+
+Load - how our app performs when traffic increases. This can definitely be tested ahead of time.
+
+Uptime - ping important parts of our app (pages, API endpoints)
+
+Metrics - measures of granular performance. Do these change over time, under specific conditions?
+
+Performance - the high-level story of the health of our application. Encompasses targets for improvement.
+
+
+-----------------------------------------
+
+**And the Best Monitoring Tool is ...**
+
+So at this point in the talk you might expect me to give you a list of the best monitoring tools and packages available and how to get started with them/ Unfortunately I’m not going to tell you which tool is correct for your scenario...
+
+The reasons for this are:
+
+- There are two many to to cover in this talk.
+- Installation is generally very well documented especially if you are using a commercial product.
+- Mentioning specific company products will quickly date my talk.
+- I have not tried all or even most of them!
+
+However - I am happy to share some of my experiences if you would like to chat after this talk.
+
+-----------------------------------------
+
+**Blackbox vs Whitebox**
+
+-----------------------------------------
+
+**Metrics**
+
+-----------------------------------------
+
+**Logging considerations**
+
+
+    What should you log and in what format?
+    Where to store logs - local log files, systemd binaries, offsite. 
+    Who will read these?
+
+Let's take a closer look at Logging...
+
+Adding logs to our app should be done with some amount of consideration. 
+
+What do you want to log? Where do you want insight? What format are our logs in and are they consistent throughout the system? Are they easily legible and searchable?
+
+Does our team know where to find the logs? Is this documented somewhere?
+
+Think about who will be reading these logs if it’s not you. Do our abbreviations make sense to them for example?
+
+-----------------------------------------
+
+**Using logging wisely**
+
+
+There is no substitute for understanding your application thoroughly. With that understanding you can make wise decsions on what to log and which level is appropriate.
+
+The level will have an impact on how these logs are handled by our hosts and how they are parsed by monitoring software and, later, by our team.
+
+-----------------------------------------
+
+**Python Logging Good Practices**
+
+    Use __name__ as the logger name
+	    logger.getLogger(__name__)
+    Dump tracebacks in log message
+	    logger.error('S3 API call failed', exc_info=True)
+
+Although I said I’m not going to do a deep dive into Python logging in this talk I will highlight 2 easy wins which are often missed by engineers knew to logging in Python.
+
+1. Use the module name to configure our logger. This is easy, portable and legible.
+2. Instead of customizing the logger message to contain the traceback, just use `exec_info`.
+
+-----------------------------------------
+
+**Alerting => Getting notfied when stuff breaks.**
+
+So we have some monitoring in place, let's consider our alerting mechanism.
+
+-----------------------------------------
+
+**Alerting - Policies**
+
+What is our alerting mechanism?
+Who should be alerted when a problem arises?
+Is there a chain of escalation?
+How is urgency determined?
+What happens post-fix?
+
+
+OK, so what happens when stuff goes wrong…..?
+
+Plan carefully whose attention should be interrupted by an issue alert. Ideally the first responder should be able to take meaningful action.
+
+If the first responder cannot deal with this issue do they know who to contact?
+
+Does this need to be escalated right now? What is the criteria for assessing urgency?
+
+Action: what needs to happen to resolve this issue? Does something need to be deployed, restarted or reset? Do other engineers need to be involved? 
+
+-----------------------------------------
+
+**Alerting - Fixing**
+
+   Is there sufficient context to debug the problem?
+   Be wary of desentizing our team by over-alerting.
+   Is it clear what action should be taken?
+
+
+Context: Do our logs or metrics show a narrative beyond ‘something broke’. What was happening in the seconds and minutes previously?
+
+Desensitizing: Too frequent alerting will quickly inure our team to these issues. Scriptspeaker firehose story:
+
+
+A few years ago I first discovered distributed log aggregation, and I thought it was cool.
+I then discovered Slack webhooks for this service, which I thought was even cooler.
+So I decided to pipe all our application logs into the Slack channel for that app. 
+There was only a couple of developers at this company, and the executives had a design (non code) background.
+I thought this was an awesome way to show off that our app was doing ‘stuff in the cloud’. 
+It took less than 2 days for my boss to ask politely if I could unhook the firehose.
+It was too much noise, and after the initial novelty even I stopped reviewing that channel.
+
+Post Fix - Once the issue is fixed -  is this a bandaid or an issue closer? What has been learned and how can this learning be captured (documentation, tickets, blog post)? 
+
+-----------------------------------------
+
+**Traffic and Load**
+
+   Traffic Monitoring can aide historical debugging.
+   Load Testing can help identify bottlenecks and determine baseline host capacity.  
+   Are you load testing the most resource-intensive APIs?
+   What metrics are being gathered during testing?
+
+
+Another useful tool for monitoring our web app’s performance is load testing.
+
+Preferably this will not directly involve our Production environment though sometimes that is relevant too.
+
+We are basically simulating traffic spikes to our site and observing what happens to performance.
+
+Again there are software packages and services to make this painless.
+
+It’s important to consider what parts of our system you are testing under load. You can start with the most critical areas of our app (landing page, login). If you have important api endpoints you may want to test those, though be wary of overloading vendor APIs during testing as they may have limits.
+
+What metrics are important to you during load testing? Page load time? Response times? Number of dropped requests?
+
+-----------------------------------------
+
+**Application Monitoring as Continuous Testing.**
+
+
+We should consider application monitoring as an approach to continually testing of our app’s health and is a compliment to robust test coverage.
+
+But beyond this. Collecting metrics over time allows us to engage in true Data Driven Development. 
+
+That is using data to influence decisions in Product Development and maintenance.
+
+
+
+-----------------------------------------
+
+**Takeaways**
+      
+Have a clear idea of what you want to monitor.
+Quality logs provide context.
+Consider our response policies.
+Third party monitoring tools can save time and increase insight.
+
+-----------------------------------------  
+
+**We can do better.**
+
+More than anything I want you to be aware that as web developers we have a variety of powerful tools. We can do better than this single warning light.
+
+
+    @samclarkeg
+
+    Thank You.
